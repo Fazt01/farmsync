@@ -1,0 +1,84 @@
+<html>
+    <head>
+        <style>
+            table {
+                font-family: arial, sans-serif;
+                border-collapse: collapse;
+            }
+
+            td, th {
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 8px;
+            }
+            body {
+                background-color: #121212;
+                color: #ffffff;
+            }
+
+            button {
+                background-color: #333;
+                color: white;
+                border: 1px solid #555;
+                padding: 12px 20px; /* Increases the clickable area */
+                font-size: 16px; /* Makes text more readable */
+                border-radius: 8px; /* Adds smooth corners */
+                cursor: pointer;
+                margin: 5px;
+            }
+
+            button:disabled {
+                background-color: #444;
+                color: #aaa;
+                border: 1px solid #666;
+                cursor: not-allowed;
+                opacity: 0.6;
+            }
+
+            input, textarea {
+                background-color: #222;
+                color: white;
+                border: 1px solid #444;
+            }
+
+            button:hover {
+                background-color: #444; /* Subtle hover effect */
+            }
+
+            button:active {
+                transform: scale(0.95); /* Slight press effect */
+            }
+        </style>
+        <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+        <script src="https://unpkg.com/htmx-ext-ws@2.0.1/ws.js"></script>
+        <script>
+            function onload() {
+                window.document.getElementById("name-input").value = window.localStorage.getItem('name');
+                window.document.body.addEventListener('htmx:configRequest', function (evt) {
+                    evt.detail.parameters['user_name'] = window.localStorage.getItem('name')
+                    if (evt.detail.elt.id === 'name-input') {
+                        window.localStorage.setItem('name', evt.detail.parameters['name'])
+                    }
+                    let visited_id = evt.detail.elt?.attributes?.visited_id?.value;
+                    if (evt.detail.elt?.attributes?.visited_id?.value !== undefined) {
+                        evt.detail.parameters['visited_id'] = +visited_id;
+                    }
+                });
+                window.sraci = new Audio("https://cdn.discordapp.com/soundboard-sounds/1335388160791810058")
+                window.sraci.volume = 0.1
+            }
+        </script>
+    </head>
+    <body onload="onload()">
+        <label for="name-input">Name: </label>
+        <input type="text" id="name-input" name="name" maxlength="20" hx-post="/change-name">
+        <div hx-ext="ws" ws-connect="/">
+            <div id="room-list">
+            </div>
+        </div>
+        <button hx-post="/cleared" hx-swap="none" onclick="sraci.play()">
+            Cleared
+        </button>
+    </body>
+</html>
+
