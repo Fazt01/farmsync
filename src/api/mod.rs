@@ -4,7 +4,7 @@ pub fn player_list(players: &Vec<PlayerData>) -> String {
     let mut result = String::new();
     result.push_str(r#"<table id="room-list">"#);
 
-    for (i, p) in players.iter().enumerate() {
+    for p in players {
         result.push_str(player(p).as_str());
     }
 
@@ -21,7 +21,7 @@ pub fn player(player: &PlayerData) -> String {
     let disabled = if player.visited { " disabled" } else { "" };
     let button = format!(
         r#"
-            <button hx-post="/visited"{disabled} visited_id="{}">
+            <button hx-post="/visited"{disabled} hx-vals='{{"visited_id":{}}}'>
                 {button_text}
             </button>
         "#,

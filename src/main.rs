@@ -1,5 +1,6 @@
 mod api;
 mod room;
+mod db;
 
 use crate::room::Room;
 use futures_util::stream::TryStreamExt;
@@ -31,10 +32,10 @@ struct Service {
 }
 
 impl Service {
-    fn new() -> Self {
+    fn new(db: db::Database) -> Self {
         Service {
             data: Arc::new(Data {
-                room: Mutex::new(Room::new()),
+                room: Room::new(db),
                 connections: Mutex::new(Default::default()),
                 connection_counter: AtomicU64::new(0),
             }),
@@ -42,8 +43,8 @@ impl Service {
     }
 
     async fn refresh_all_player_lists(&self) -> anyhow::Result<()> {
-        let room = &*self.data.room.lock().await;
-        let text = api::player_list(&room.all_players());
+        let room = &self.data.room;
+        let text = api::player_list(&room.all_players()?);
         self.send_to_all(Message::text(text)).await
     }
 
@@ -61,19 +62,21 @@ impl Service {
 }
 
 struct Data {
-    room: Mutex<Room>,
+    room: Room,
     connections: Mutex<HashMap<u64, Sender<Message>>>,
     connection_counter: AtomicU64,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let db = db::Database::new()?;
+    db.migrate()?;
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
-    // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
 
-    let service = Service::new();
+    let service = Service::new(db);
 
     // We start a loop to continuously accept incoming connections
     loop {
@@ -175,15 +178,13 @@ async fn handle_http_request(
             service
                 .data
                 .room
-                .lock()
-                .await
-                .change_name(parsed_req.user_name.as_str(), parsed_req.name);
+                .change_name(parsed_req.user_name.as_str(), parsed_req.name.as_str())?;
             service.refresh_all_player_lists().await?;
             Ok(Response::new(empty()))
         }
         (&Method::POST, "/visited") => {
             let parsed_req: VisitedReq = req_to_parsed_form_data(req).await?;
-            let player_data = service.data.room.lock().await.visited(parsed_req.visited_id);
+            let player_data = service.data.room.visited(parsed_req.visited_id, &parsed_req.user_name)?;
             if let Some(player_data) = player_data {
                 service.refresh_player_in_all_lists(player_data).await?;
             }
@@ -191,7 +192,7 @@ async fn handle_http_request(
         }
         (&Method::POST, "/cleared") => {
             let parsed_req: ClearedReq = req_to_parsed_form_data(req).await?;
-            let player_data = service.data.room.lock().await.cleared(parsed_req.user_name.as_str());
+            let player_data = service.data.room.cleared(parsed_req.user_name.as_str())?;
             if let Some(player_data) = player_data {
                 service.refresh_player_in_all_lists(player_data).await?;
             }
@@ -213,7 +214,7 @@ async fn handle_http_request(
 async fn handle_websocket(websocket: HyperWebsocket, service: Service) -> anyhow::Result<()> {
     let mut websocket = websocket.await?;
 
-    let text = api::player_list(&service.data.room.lock().await.all_players());
+    let text = api::player_list(&service.data.room.all_players()?);
 
     websocket.send(Message::text(text)).await?;
 

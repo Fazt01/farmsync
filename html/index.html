@@ -53,15 +53,21 @@
         <script src="https://unpkg.com/htmx-ext-ws@2.0.1/ws.js"></script>
         <script>
             function onload() {
-                window.document.getElementById("name-input").value = window.localStorage.getItem('name');
+                const name = window.localStorage.getItem('name')
+                if (name !== null) {
+                    window.document.getElementById("name-input").value = name
+                    const form = new FormData();
+                    form.append("name", name)
+                    form.append("user_name", name)
+                    const req = new XMLHttpRequest();
+                    req.open("POST", "/change-name", true)
+                    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
+                    req.send(new URLSearchParams(form))
+                }
                 window.document.body.addEventListener('htmx:configRequest', function (evt) {
                     evt.detail.parameters['user_name'] = window.localStorage.getItem('name')
                     if (evt.detail.elt.id === 'name-input') {
                         window.localStorage.setItem('name', evt.detail.parameters['name'])
-                    }
-                    let visited_id = evt.detail.elt?.attributes?.visited_id?.value;
-                    if (evt.detail.elt?.attributes?.visited_id?.value !== undefined) {
-                        evt.detail.parameters['visited_id'] = +visited_id;
                     }
                 });
                 window.sraci = new Audio("https://cdn.discordapp.com/soundboard-sounds/1335388160791810058")
